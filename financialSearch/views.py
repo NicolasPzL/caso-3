@@ -35,6 +35,12 @@ import yfinance as yf
 from datetime import datetime
 import pandas as pd
 
+from datetime import datetime
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+import yfinance as yf
+import pandas as pd
+
 @login_required(login_url='/login')
 def getReturns(request):
     if request.method == 'POST':
@@ -46,13 +52,15 @@ def getReturns(request):
         start = datetime.strptime(from_date, '%Y-%m-%d')
         end = datetime.strptime(to_date, '%Y-%m-%d')
 
-        stock_data = yf.download(brand, start=start, end=end)
+        # Crear el objeto Ticker y usar .history()
+        ticker = yf.Ticker(brand)
+        stock_data = ticker.history(start=start, end=end)
 
-        closing_prices = stock_data['Close'].tolist()
-        dates = stock_data.index.strftime('%Y-%m-%d').tolist()
+        closing_prices = stock_data['Close'].to_list()
+        dates = stock_data.index.strftime('%Y-%m-%d').to_list()
 
         stock_data['SMA_5'] = stock_data['Close'].rolling(window=5).mean()
-        sma_5 = stock_data['SMA_5'].tolist()
+        sma_5 = stock_data['SMA_5'].to_list()
 
         analysis = analyze_data(sma_5)
 
@@ -68,12 +76,12 @@ def getReturns(request):
             ],
             'analysis': analysis
         }
-        
+
         return JsonResponse(data)
 
     return JsonResponse({'error': 'Método no permitido'}, status=405)
 
+
 def analyze_data(prices):
     analysis = "Implemente su análisis acá."
     return analysis
-
