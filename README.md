@@ -1,22 +1,9 @@
 # Caso de Estudio 3: Pruebas de Software - Django y Testeo web
 
-Este proyecto fue realizado por Camilo Herrera-Arcila, M.Sc. Prohibido todo su uso y distribución sin previa autorización del autor. Para solicitar más información, escriba a [camilo.arcila97@gmail.com](mailto:camilo.arcila97@gmail.com) y su propósito es solamente educativo para la Universidad de San Buenaventura - Medellín en el curso de Pruebas de Software.
-
 ## Descripción del Proyecto
 
 Este proyecto tiene como objetivo proporcionar una experiencia práctica en la generación y ejecución de pruebas de software unitarias e integración, utilizando Pytest y Allure. Se deberá implementar dobles de prueba, gestionar archivos, y aplicar fixtures para el correcto manejo del entorno de pruebas. Ambos serán integrados dentro del framework Django. **Usuario:** clase, **Contraseña:** clase2024.
 
-## Antes de comenzar
-
-- Instale los requerimientos en su entorno virtual
-- Pruebe el aplicativo ejecutando:
-  
-```bash
-python manage.py runserver
-```
-
-- Ya estás listo para comenzar.
-  
 ## Actividad a Realizar
 
 1. **Exploración del aplicativo**: Como nota, este trabajo no tiene una descripción detallada de la funcionalidad del mismo. Debe explorar el aplicativo para conocer la funcionalidad del software entregado.
@@ -33,6 +20,7 @@ python manage.py runserver
 6. **Uso de Fixtures**:
    - Aplicar fixtures para la configuración y limpieza de pruebas (`setUp` y `tearDown`).
 7. **Informe Escrito**:
+
    - Elaborar un informe escrito que contenga:
      - Introducción
      - Resumen ejecutivo con el resultado de todas las pruebas.
@@ -48,35 +36,10 @@ python manage.py runserver
    - Utilizar Allure para generar un informe digital.
    - Incluir metadatos en cada prueba utilizando decoradores de Allure como `@allure.title`, `@allure.issue`, y todas las demás vistas en clase (consulte la página web de allure para más detalles).
 
-### Comandos para Generar el Informe con Allure
+# Ejecutar todas las pruebas con Allure
 
-Para generar el informe con Allure, utiliza los siguientes comandos:
+pytest --alluredir=./allure-results
 
-```bash
-# Ejecutar las pruebas y generar el reporte
-pytest --alluredir allure-results
+# Generar reporte de Allure
 
-# Generar el informe visual
-allure generate allure-report
-```
-
-## Entregables
-
-Los entregables para esta actividad son:
-
-1. Informe escrito en formato PDF o Word.
-2. Informe de Allure generado.
-3. Proyecto comprimido en formato ZIP que incluya todas las pruebas en el archivo `tests.py` de Django en la app objetivo.
-4. Realice la presentación / sustentación para el caso de estudio.
-
-## Rúbricas de Evaluación
-
-La evaluación se realizará con base en los siguientes criterios:
-
-1. **Calidad de las Pruebas (30%):** Cobertura de casos de prueba. Uso adecuado de dobles de prueba. Aplicación de fixtures.
-
-2. **Informe Escrito (60%):** Claridad y estructura del informe. Detalle de las pruebas y resultados.
-
-3. **Informe de Allure (10%):** Complejidad de las pruebas, uso adecuado de metadatos que se muestran en el informe html y corercta integración con Django.
-
-¡Buena suerte con el caso de estudio! Si tienen alguna pregunta, no duden en preguntar.
+allure generate allure-results --clean -o allure-report

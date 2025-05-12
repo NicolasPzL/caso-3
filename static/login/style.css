@@ -52,3 +52,114 @@ body {
     color: rgb(202, 0, 0);
     font-weight: 600;
 }
+
+.analysis-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.analysis-charts canvas {
+    width: 100% !important;
+    height: 300px !important;
+}
+
+#analysisResult {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+#analysisResult h4, #analysisResult h5 {
+    color: #333;
+    margin-top: 15px;
+}
+
+#analysisResult ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#analysisResult li {
+    margin: 5px 0;
+    padding: 5px;
+    background-color: #fff;
+    border-radius: 3px;
+}
+
+.analysis-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.analysis-charts canvas {
+    width: 100% !important;
+    height: 300px !important;
+    margin-bottom: 20px;
+}
+
+#analysisResult {
+    margin-top: 30px;
+    padding: 25px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+#analysisResult h4 {
+    color: #333;
+    margin-top: 15px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+}
+
+#analysisResult ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#analysisResult li {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background-color: #fff;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+#analysisResult p {
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.stats-highlight {
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* Estilos adicionales para mejorar la experiencia de usuario */
+.loading-indicator {
+    display: none;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 2s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

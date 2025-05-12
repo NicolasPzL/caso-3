@@ -1,5 +1,32 @@
-pandas
-numpy
-django
-yfinance
-pytest
+# requirements-test.txt
+# Dependencias para pruebas
+
+# Testing
+pytest==7.4.0
+pytest-django==4.5.2
+pytest-cov==4.1.0
+pytest-html==3.2.0
+pytest-mock==3.11.1
+pytest-xdist==3.3.1
+
+# Allure
+allure-pytest==2.13.2
+allure-python-commons==2.13.2
+
+# Mocking
+factory-boy==3.3.0
+faker==19.3.0
+
+# Coverage
+coverage==7.3.0
+
+# Análisis de código
+flake8==6.1.0
+black==23.7.0
+isort==5.12.0
+
+# Dependencias del proyecto
+django>=4.0
+pandas>=1.5.0
+numpy>=1.20.0
+yfinance>=0.2.0

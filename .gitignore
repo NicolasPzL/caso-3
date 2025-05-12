@@ -1,2 +1,8 @@
-venv/
+env/
 __pycache__/
+allure-results/
+allure-report/
+htmlcov/
+.pytest_cache/
+
+
