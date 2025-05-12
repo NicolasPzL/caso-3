@@ -1,0 +1,17 @@
+[1m[31mERROR   [0m django.request:log.py:248 Internal Server Error: /getReturns
+Traceback (most recent call last):
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\financialSearch\views.py", line 56, in getReturns
+    ticker = yf.Ticker(brand)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\yfinance\ticker.py", line 35, in __init__
+    super(Ticker, self).__init__(ticker, session=session, proxy=proxy)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\yfinance\base.py", line 52, in __init__
+    self.ticker = ticker.upper()
+                  ^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'upper'

@@ -340,20 +340,62 @@ class TestGetReturnsView:
     @allure.tag("returns", "negative", "input_validation")
     @allure.severity(Severity.NORMAL)
     @pytest.mark.parametrize(
-        "payload_variant, missing_field_name",
+        "payload_variant, missing_field_name, expected_error_type, expected_error_message",
         [
-            ({'to': '2023-01-05', 'brand': 'AAPL'}, "from"),
-            ({'from': '2023-01-01', 'brand': 'AAPL'}, "to"),
-            ({'from': '2023-01-01', 'to': '2023-01-05'}, "brand"),
+            (
+                {'to': '2023-01-05', 'brand': 'AAPL'}, 
+                "from",
+                TypeError,
+                "strptime() argument 1 must be str, not None"
+            ),
+            (
+                {'from': '2023-01-01', 'brand': 'AAPL'}, 
+                "to",
+                TypeError,
+                "strptime() argument 1 must be str, not None"
+            ),
+            (
+                {'from': '2023-01-01', 'to': '2023-01-05'}, 
+                "brand",
+                AttributeError,
+                "'NoneType' object has no attribute"
+            ),
         ]
     )
-    def test_get_returns_missing_required_fields(self, authenticated_client, payload_variant, missing_field_name):
+    def test_get_returns_missing_required_fields(
+        self, 
+        authenticated_client, 
+        payload_variant, 
+        missing_field_name,
+        expected_error_type,
+        expected_error_message
+    ):
         with allure.step(f"POST a {self.GET_RETURNS_URL} faltando el campo '{missing_field_name}'"):
-            # Tu vista usa request.POST.get() para 'from', 'to', 'brand'.
-            # Si falta uno, será None. Esto causará un error en:
-            # - datetime.strptime(None, ...) -> TypeError
-            # - yf.Ticker(None) -> Probablemente un error dentro de yfinance o AttributeError
-            # Idealmente, tu vista debería validar que estos campos no sean None ANTES de usarlos
-            # y devolver un error 400. Si no, se espera una excepción no controlada.
-            with pytest.raises((TypeError, ValueError, AttributeError)): # Cubre varios posibles errores por None
+            with pytest.raises(expected_error_type) as exc_info:
                 authenticated_client.post(self.GET_RETURNS_URL, payload_variant)
+            
+            # Verificar el mensaje de error específico de manera más flexible
+            error_message = str(exc_info.value)
+            
+            if missing_field_name in ['from', 'to']:
+                # Para campos de fecha, verificar el mensaje de strptime
+                assert "strptime() argument 1 must be str" in error_message, \
+                    f"El mensaje de error debería mencionar 'strptime() argument 1 must be str', pero fue: '{error_message}'"
+                assert "None" in error_message, \
+                    f"El mensaje de error debería mencionar 'None', pero fue: '{error_message}'"
+            elif missing_field_name == 'brand':
+                # Para el campo brand, verificar el mensaje de AttributeError
+                assert "NoneType" in error_message, \
+                    f"El mensaje de error debería mencionar 'NoneType', pero fue: '{error_message}'"
+                assert "has no attribute" in error_message, \
+                    f"El mensaje de error debería mencionar 'has no attribute', pero fue: '{error_message}'"
+            
+            # Verificar que el campo faltante está en el payload
+            assert missing_field_name not in payload_variant, \
+                f"El campo '{missing_field_name}' no debería estar presente en el payload"
+            
+            # Verificar que los otros campos están presentes
+            for field in ['from', 'to', 'brand']:
+                if field != missing_field_name:
+                    assert field in payload_variant, \
+                        f"El campo '{field}' debería estar presente en el payload"

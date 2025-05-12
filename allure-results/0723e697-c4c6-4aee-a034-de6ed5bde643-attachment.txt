@@ -1,0 +1,19 @@
+[1m[31mERROR   [0m django.request:log.py:248 Internal Server Error: /getReturns
+Traceback (most recent call last):
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\env\Lib\site-packages\django\contrib\auth\decorators.py", line 59, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\7mo Semestre\Pruebas de Software\Caso_estudio3\caso-3\financialSearch\views.py", line 57, in getReturns
+    stock_data = ticker.history(start=start, end=end)
+  File "C:\Users\nicop\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py", line 1167, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\nicop\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py", line 1171, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\nicop\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py", line 1226, in _execute_mock_call
+    raise effect
+ConnectionError: Error de conexión simulado con yfinance API
