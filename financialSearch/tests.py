@@ -311,9 +311,9 @@ class TestGetReturnsView:
 
         payload = {'from': '2023-01-01', 'to': '2023-01-05', 'brand': 'ERROR_TICKER'}
         with allure.step(f"POST a {self.GET_RETURNS_URL} esperando una excepción de yfinance"):
-            # Esta prueba ASUME que tu vista NO tiene un try-except para la llamada a .history()
+            # Esta prueba ASUME que la vista NO tiene un try-except para la llamada a .history()
             # y que la excepción se propagará, causando un error 500 en Django.
-            # Si tu vista SÍ maneja la excepción y devuelve un JsonResponse de error,
+            # Si la vista SÍ maneja la excepción y devuelve un JsonResponse de error,
             # deberás cambiar esta aserción para verificar ese JsonResponse.
             with pytest.raises(ConnectionError, match=simulated_error_message):
                 authenticated_client.post(self.GET_RETURNS_URL, payload)
