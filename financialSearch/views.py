@@ -303,6 +303,144 @@ def analyze_data(stock_data):
         
     except Exception as e:
         raise ValueError(f"Error en el análisis de datos: {str(e)}")
+    
+def generate_quantitative_report(df):
+    """
+    Genera un informe cuantitativo detallado basado en el comportamiento histórico
+    de los precios de cierre para determinar recomendación de compra/venta.
+    Mínimo 150 palabras.
+    """
+    
+    # Análisis del comportamiento histórico de precios de cierre
+    close_prices = df['Close']
+    
+    # Cálculos estadísticos básicos
+    initial_price = close_prices.iloc[0]
+    final_price = close_prices.iloc[-1]
+    mean_price = close_prices.mean()
+    std_price = close_prices.std()
+    max_price = close_prices.max()
+    min_price = close_prices.min()
+    
+    # Análisis de tendencia
+    price_change = final_price - initial_price
+    percentage_change = (price_change / initial_price) * 100
+    
+    # Análisis de retornos
+    daily_returns = df['Daily_Return'].dropna()
+    positive_days = (daily_returns > 0).sum()
+    negative_days = (daily_returns < 0).sum()
+    total_days = len(daily_returns)
+    win_rate = (positive_days / total_days) * 100
+    
+    # Análisis de volatilidad y riesgo
+    volatility = daily_returns.std()
+    sharpe_ratio = daily_returns.mean() / volatility if volatility != 0 else 0
+    
+    # Análisis de momentum
+    momentum_10 = df['Momentum'].iloc[-1]
+    momentum_trend = "positiva" if momentum_10 > 0 else "negativa"
+    
+    # Determinación de recomendación
+    score = 0
+    
+    # Criterios de evaluación
+    if percentage_change > 10:
+        score += 2
+    elif percentage_change > 0:
+        score += 1
+    else:
+        score -= 1
+    
+    if win_rate > 55:
+        score += 1
+    elif win_rate < 45:
+        score -= 1
+    
+    if final_price > df['SMA_50'].iloc[-1]:
+        score += 1
+    else:
+        score -= 1
+    
+    if df['RSI'].iloc[-1] < 70 and df['RSI'].iloc[-1] > 30:
+        score += 1
+    
+    if momentum_10 > 0:
+        score += 1
+    else:
+        score -= 1
+    
+    # Recomendación final
+    if score >= 3:
+        recommendation = "COMPRA FUERTE"
+    elif score >= 1:
+        recommendation = "COMPRA"
+    elif score >= -1:
+        recommendation = "MANTENER"
+    elif score >= -3:
+        recommendation = "VENTA"
+    else:
+        recommendation = "VENTA FUERTE"
+    
+    # Generación del informe
+    report = f"""
+    <div class="quantitative-report" style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-top: 30px;">
+        <h4>Informe Cuantitativo Detallado</h4>
+        
+        <p style="text-align: justify;">
+        Basándonos en el análisis cuantitativo exhaustivo del comportamiento histórico de los precios de cierre,
+        presentamos la siguiente evaluación detallada. Durante el período analizado, el precio de la acción 
+        experimentó una variación del <strong>{percentage_change:.2f}%</strong>, partiendo de un precio inicial 
+        de <strong>${initial_price:.2f}</strong> hasta alcanzar <strong>${final_price:.2f}</strong>.
+        </p>
+        
+        <p style="text-align: justify;">
+        El análisis estadístico revela que el precio promedio durante el período fue de <strong>${mean_price:.2f}</strong>, 
+        con una desviación estándar de <strong>${std_price:.2f}</strong>, lo que indica un nivel de volatilidad 
+        {'alto' if std_price/mean_price > 0.2 else 'moderado' if std_price/mean_price > 0.1 else 'bajo'}. 
+        La acción alcanzó un máximo de <strong>${max_price:.2f}</strong> y un mínimo de <strong>${min_price:.2f}</strong>, 
+        mostrando un rango de fluctuación del <strong>{((max_price - min_price) / mean_price * 100):.2f}%</strong>.
+        </p>
+        
+        <p style="text-align: justify;">
+        En términos de rendimiento diario, observamos que de los {total_days} días de trading analizados, 
+        {positive_days} días ({win_rate:.1f}%) registraron ganancias, mientras que {negative_days} días 
+        ({((negative_days/total_days)*100):.1f}%) mostraron pérdidas. Este ratio de éxito 
+        {'superior al 50%' if win_rate > 50 else 'inferior al 50%'} sugiere una tendencia 
+        {'alcista' if win_rate > 50 else 'bajista'} en el comportamiento general del activo.
+        </p>
+        
+        <p style="text-align: justify;">
+        Los indicadores técnicos complementarios respaldan nuestra evaluación. El momentum actual muestra 
+        una tendencia {momentum_trend}, mientras que el RSI de {df['RSI'].iloc[-1]:.2f} indica que la acción 
+        {'está en zona de sobrecompra' if df['RSI'].iloc[-1] > 70 else 'está en zona de sobreventa' if df['RSI'].iloc[-1] < 30 else 'se encuentra en territorio neutral'}. 
+        La relación precio/media móvil de 50 días es {'positiva' if final_price > df['SMA_50'].iloc[-1] else 'negativa'}, 
+        lo que {'confirma' if final_price > df['SMA_50'].iloc[-1] else 'contradice'} la tendencia general observada.
+        </p>
+        
+        <h3 style="color: {'#28a745' if 'COMPRA' in recommendation else '#dc3545' if 'VENTA' in recommendation else '#ffc107'};">
+        Recomendación Final: {recommendation}
+        </h3>
+        
+        <p style="text-align: justify;">
+        <strong>Conclusión:</strong> Tras un análisis cuantitativo integral del comportamiento histórico de los precios 
+        de cierre, considerando factores como la tendencia general, volatilidad, ratio de éxito en días de trading, 
+        y los indicadores técnicos clave, nuestra recomendación es <strong>{recommendation.lower()}</strong> las acciones 
+        de este activo. {'Esta recomendación se basa en el rendimiento positivo acumulado y los indicadores técnicos favorables.' if 'COMPRA' in recommendation 
+        else 'Esta recomendación se fundamenta en el rendimiento negativo y las señales técnicas desfavorables.' if 'VENTA' in recommendation 
+        else 'Esta recomendación refleja un panorama mixto que sugiere cautela y observación continua del mercado.'}
+        </p>
+        
+        <p style="text-align: justify;">
+        <strong>Nota de Riesgo:</strong> Este análisis se basa exclusivamente en datos históricos y no garantiza 
+        resultados futuros. Se recomienda considerar factores adicionales como noticias del mercado, análisis 
+        fundamental de la empresa, y su tolerancia personal al riesgo antes de tomar decisiones de inversión.
+        </p>
+    </div>
+    """
+    
+    return report
+
 
 def generate_analysis_text(df):
     """
@@ -445,4 +583,10 @@ def generate_analysis_text(df):
     </ul>
     """
     
-    return analysis_text
+    
+    quantitative_report = generate_quantitative_report(df)
+    
+    # Combinar el análisis existente con el informe cuantitativo
+    complete_analysis = analysis_text + quantitative_report
+    
+    return complete_analysis

@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import json
 from unittest.mock import patch, MagicMock, Mock
 import allure
+from unittest import mock
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.test import TransactionTestCase
@@ -55,13 +56,25 @@ def pytest_runtest_makereport(item, call):
 
 # === FIXTURES GLOBALES ===
 
+@pytest.fixture
+@allure.step("Crear un cliente Django no autenticado")
+def client(db): # Renombrado de client_anonymous para brevedad, como en tu último código
+    """Fixture para crear un cliente Django no autenticado."""
+    return Client()
+
+@pytest.fixture
+@allure.step("Crear un cliente Django autenticado con test_user")
+def authenticated_client(client, test_user): # Reutiliza la fixture 'client'
+    """Fixture para crear un cliente Django autenticado con test_user."""
+    client.login(username=test_user.username, password='clase2024')
+    return client
+
 @pytest.fixture(scope='session')
 def django_db_setup(django_db_setup, django_db_blocker):
     """Setup de base de datos para toda la sesión de pruebas"""
     with django_db_blocker.unblock():
         # Crear datos de prueba globales si es necesario
         pass
-
 
 @pytest.fixture
 def test_user(db):
@@ -184,6 +197,387 @@ def mock_yfinance_error():
 
 # === SUITE DE PRUEBAS PRINCIPAL ===
 
+
+# --- Pruebas de Autenticación ---
+@allure.feature("Sistema de Autenticación")
+class TestAuthentication:
+    LOGIN_URL = '/login'
+    LOGOUT_URL = '/logout'
+    HOME_URL = '/' # Para verificar redirección
+
+    @allure.title("Login Exitoso")
+    @allure.description("Verifica que un usuario puede iniciar sesión correctamente con credenciales válidas y es redirigido a la página principal.")
+    @allure.tag("auth", "positive", "smoke")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_login_successful(self, client, test_user): # Usa el cliente anónimo para el POST de login
+        payload = {'username': test_user.username, 'password': 'testpass123'}
+        with allure.step(f"POST a {self.LOGIN_URL} con credenciales válidas"):
+            response = client.post(self.LOGIN_URL, payload)
+        
+        with allure.step("Verificar redirección (302) a la página principal ('/')"):
+            assert response.status_code == 302, "El login exitoso debería resultar en un código de estado 302 (redirección)."
+            assert response.url == self.HOME_URL, f"Tras un login exitoso, se esperaba redirección a '{self.HOME_URL}', pero fue a '{response.url}'."
+        
+        with allure.step("Verificar que el usuario está autenticado en la sesión"):
+            assert '_auth_user_id' in client.session, "La clave '_auth_user_id' que indica autenticación no se encontró en la sesión."
+            assert client.session['_auth_user_id'] == str(test_user.id), "El ID del usuario autenticado en la sesión no coincide con el ID del usuario de prueba."
+
+    @allure.title("Login Fallido - Credenciales Inválidas (Usuario Inexistente)")
+    @allure.description("Verifica que el sistema rechaza credenciales inválidas cuando el usuario no existe.")
+    @allure.tag("auth", "negative")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_login_invalid_credentials_nonexistent_user(self, client): # Usa el cliente anónimo
+        payload = {'username': 'usuario_no_existe', 'password': 'password_incorrecta'}
+        with allure.step(f"POST a {self.LOGIN_URL} con usuario inexistente"):
+            response = client.post(self.LOGIN_URL, payload)
+        
+        with allure.step("Verificar permanencia en página de login (200) y mensaje de error"):
+            assert response.status_code == 200, "Tras un login fallido, se esperaba permanecer en la página de login (código 200)."
+            assert 'Username and/or password incorrect.' in response.content.decode(), "No se encontró el mensaje de error esperado para credenciales inválidas."
+        
+        with allure.step("Verificar que el usuario NO está autenticado en la sesión"):
+            assert '_auth_user_id' not in client.session, "Un usuario no debería autenticarse con credenciales inválidas."
+
+    @allure.title("Login Fallido - Contraseña Incorrecta para Usuario Existente")
+    @allure.description("Verifica que el sistema rechaza una contraseña incorrecta para un usuario válido.")
+    @allure.tag("auth", "negative")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_login_invalid_credentials_wrong_password(self, client, test_user): # Usa cliente anónimo y test_user para el username
+        payload = {'username': test_user.username, 'password': 'password_incorrecta'}
+        with allure.step(f"POST a {self.LOGIN_URL} con contraseña incorrecta para usuario '{test_user.username}'"):
+            response = client.post(self.LOGIN_URL, payload)
+
+        with allure.step("Verificar permanencia en página de login (200) y mensaje de error"):
+            assert response.status_code == 200
+            assert 'Username and/or password incorrect.' in response.content.decode()
+        with allure.step("Verificar que el usuario NO está autenticado en la sesión"):
+            assert '_auth_user_id' not in client.session
+
+    @allure.title("Login Fallido - Campos Vacíos (Username)")
+    @allure.description("Verifica el comportamiento del login cuando el campo username está vacío.")
+    @allure.tag("auth", "negative", "input_validation")
+    @allure.severity(allure.severity_level.MINOR)
+    def test_login_empty_username(self, client):
+        payload = {'username': '', 'password': 'clase2024'}
+        with allure.step(f"POST a {self.LOGIN_URL} con username vacío"):
+            response = client.post(self.LOGIN_URL, payload)
+        with allure.step("Verificar mensaje de 'Username and password required'"):
+            assert response.status_code == 200
+            assert 'Username and password required' in response.content.decode()
+            assert '_auth_user_id' not in client.session
+
+    @allure.title("Login Fallido - Campos Vacíos (Password)")
+    @allure.description("Verifica el comportamiento del login cuando el campo password está vacío.")
+    @allure.tag("auth", "negative", "input_validation")
+    @allure.severity(allure.severity_level.MINOR)
+    def test_login_empty_password(self, client, test_user):
+        payload = {'username': test_user.username, 'password': ''}
+        with allure.step(f"POST a {self.LOGIN_URL} con password vacío para usuario '{test_user.username}'"):
+            response = client.post(self.LOGIN_URL, payload)
+        with allure.step("Verificar mensaje de 'Username and password required'"):
+            assert response.status_code == 200
+            assert 'Username and password required' in response.content.decode()
+            assert '_auth_user_id' not in client.session
+
+    @allure.title("Logout Exitoso")
+    @allure.description("Verifica que un usuario autenticado puede cerrar sesión correctamente y es redirigido a la página de login.")
+    @allure.tag("auth", "positive", "smoke")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_logout_successful(self, authenticated_client): # Usa cliente ya autenticado
+        with allure.step(f"GET a {self.LOGOUT_URL} para cerrar sesión"):
+            response = authenticated_client.get(self.LOGOUT_URL)
+        
+        with allure.step("Verificar redirección (302) a la página de login"):
+            assert response.status_code == 302, "El logout exitoso debería resultar en un código 302."
+            assert response.url == self.LOGIN_URL, f"Tras el logout, se esperaba redirección a '{self.LOGIN_URL}', pero fue a '{response.url}'."
+        
+        with allure.step("Verificar que el usuario ya NO está autenticado en la sesión"):
+            assert '_auth_user_id' not in authenticated_client.session, "El usuario todavía parece estar autenticado en la sesión después del logout."
+            
+# --- Pruebas de Vista Home ---
+@allure.feature("Vista Principal (Home)")
+class TestHomeView:
+    HOME_URL = '/'
+    LOGIN_URL = '/login'
+
+    @allure.title("Acceso a Home - Usuario Autenticado")
+    @allure.description("Verifica que un usuario autenticado puede acceder a la página principal y ver su contenido.")
+    @allure.tag("home", "positive", "smoke")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_home_authenticated_access(self, authenticated_client):
+        with allure.step(f"GET a {self.HOME_URL} como usuario autenticado"):
+            response = authenticated_client.get(self.HOME_URL)
+        
+        with allure.step("Verificar acceso exitoso (200) y contenido clave"):
+            assert response.status_code == 200, "Un usuario autenticado debería poder acceder a la página principal (código 200)."
+            response_content_str = response.content.decode()
+            assert "Consulta de Datos de Yahoo Finance" in response_content_str, "El título del formulario principal no se encontró en la página Home."
+            assert 'id="consultaForm"' in response_content_str, "El formulario con id='consultaForm' no se encontró en la página Home."
+
+    @allure.title("Acceso a Home - Usuario No Autenticado es Redirigido")
+    @allure.description("Verifica que un usuario no autenticado que intenta acceder a Home es redirigido a la página de login.")
+    @allure.tag("home", "negative", "security")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_home_unauthenticated_redirect(self, client): # Usa cliente anónimo
+        with allure.step(f"GET a {self.HOME_URL} como usuario no autenticado"):
+            response = client.get(self.HOME_URL)
+        
+        with allure.step(f"Verificar redirección (302) a '{self.LOGIN_URL}?next={self.HOME_URL}'"):
+            assert response.status_code == 302, "Un usuario no autenticado debería ser redirigido (código 302) al intentar acceder a Home."
+            expected_redirect_url_start = f"{self.LOGIN_URL}?next={self.HOME_URL}"
+            assert response.url == expected_redirect_url_start, \
+                f"Se esperaba redirección a '{expected_redirect_url_start}', pero fue a '{response.url}'."
+                
+# --- Pruebas de Vista getReturns ---
+@allure.feature("Obtención de Datos Financieros (getReturns)")
+class TestGetReturnsView:
+    GET_RETURNS_URL = '/getReturns'
+    LOGIN_URL = '/login'
+
+    @pytest.fixture
+    @allure.step("Crear datos simulados de yfinance para pruebas")
+    def mock_yfinance_data(self):
+        """Fixture para generar datos simulados de yfinance.history()."""
+        data = {
+            'Open': [150.0, 151.0, 150.5, 152.0, 151.5],
+            'High': [152.0, 151.5, 151.0, 153.0, 152.5],
+            'Low': [149.0, 150.0, 149.5, 150.5, 150.0],
+            'Close': [151.0, 150.5, 150.0, 152.5, 151.0],
+            'Volume': [100000, 120000, 110000, 130000, 105000]
+        }
+        # Usar pd.date_range para un índice de fechas más robusto
+        dates = pd.date_range(start='2023-01-01', periods=5, freq='B') # Freq 'B' para días hábiles
+        return pd.DataFrame(data, index=dates)
+
+
+    @allure.title("getReturns Requiere Autenticación")
+    @allure.description("Verifica que un usuario no autenticado sea redirigido al intentar acceder a getReturns.")
+    @allure.tag("returns", "negative", "security")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_get_returns_requires_authentication(self, client): # Usa cliente anónimo
+        payload = {'from': '2023-01-01', 'to': '2023-01-05', 'brand': 'MSFT'}
+        with allure.step(f"POST a {self.GET_RETURNS_URL} como usuario no autenticado"):
+            response = client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step(f"Verificar redirección (302) a '{self.LOGIN_URL}?next={self.GET_RETURNS_URL}'"):
+            assert response.status_code == 302
+            expected_redirect_url_start = f"{self.LOGIN_URL}?next={self.GET_RETURNS_URL}"
+            assert response.url == expected_redirect_url_start, \
+                f"Se esperaba redirección a '{expected_redirect_url_start}', pero fue a '{response.url}'."
+
+    @allure.title("getReturns Solo Permite Método POST")
+    @allure.description("Verifica que la vista getReturns rechace solicitudes con métodos HTTP diferentes a POST (ej. GET).")
+    @allure.tag("returns", "negative", "protocol")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_get_returns_rejects_get_method(self, authenticated_client):
+        with allure.step(f"GET a {self.GET_RETURNS_URL} como usuario autenticado"):
+            response = authenticated_client.get(self.GET_RETURNS_URL)
+        
+        with allure.step("Verificar respuesta de error 405 (Método No Permitido)"):
+            assert response.status_code == 405, "Una solicitud GET a getReturns debería resultar en un error 405."
+            assert response.json()['error'] == 'Método no permitido', "El mensaje de error para método no permitido no es el esperado."
+
+    @allure.title("getReturns Maneja Formato de Fecha Inválido")
+    @allure.description("Verifica que la vista maneje formatos de fecha incorrectos con JsonResponse de error 400.")
+    @allure.tag("returns", "negative", "input_validation")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_get_returns_invalid_date_format(self, authenticated_client):
+        payload = {'from': 'fecha_incorrecta_formato', 'to': '2023-01-05', 'brand': 'AAPL'}
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} con formato de fecha 'from' inválido"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 400 para formato de fecha inválido"):
+            assert response.status_code == 400, "Debería devolver un código 400 para formato de fecha inválido"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Formato de fecha inválido' in response_json['error']
+            assert 'YYYY-MM-DD' in response_json['error']
+
+
+    @allure.title("getReturns Maneja Campos POST Requeridos Faltantes")
+    @allure.description("Verifica cómo responde la vista cuando faltan campos esenciales en el payload POST.")
+    @allure.tag("returns", "negative", "input_validation")
+    @allure.severity(allure.severity_level.NORMAL)
+    @pytest.mark.parametrize(
+        "payload_variant, missing_field_name",
+        [
+            ({'to': '2023-01-05', 'brand': 'AAPL'}, "from"),
+            ({'from': '2023-01-01', 'brand': 'AAPL'}, "to"),
+            ({'from': '2023-01-01', 'to': '2023-01-05'}, "brand"),
+        ]
+    )
+    def test_get_returns_missing_required_fields(
+        self, 
+        authenticated_client, 
+        payload_variant, 
+        missing_field_name
+    ):
+        with allure.step(f"POST a {self.GET_RETURNS_URL} faltando el campo '{missing_field_name}'"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload_variant)
+        
+        with allure.step("Verificar respuesta de error 400 para campo faltante"):
+            assert response.status_code == 400, f"Debería devolver un código 400 cuando falta el campo '{missing_field_name}'"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Todos los campos son requeridos' in response_json['error']
+        
+        with allure.step("Verificar estructura del payload"):
+            # Verificar que el campo faltante está en el payload
+            assert missing_field_name not in payload_variant, \
+                f"El campo '{missing_field_name}' no debería estar presente en el payload"
+            
+            # Verificar que los otros campos están presentes
+            for field in ['from', 'to', 'brand']:
+                if field != missing_field_name:
+                    assert field in payload_variant, \
+                        f"El campo '{field}' debería estar presente en el payload"
+
+
+    @allure.title("getReturns Maneja Fechas en el Futuro")
+    @allure.description("Verifica que la vista rechace fechas que están en el futuro.")
+    @allure.tag("returns", "negative", "input_validation")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_get_returns_future_dates(self, authenticated_client):
+        # Obtener una fecha futura
+        future_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        payload = {
+            'from': '2023-01-01',
+            'to': future_date,
+            'brand': 'AAPL'
+        }
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} con fecha futura"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 400 para fecha futura"):
+            assert response.status_code == 400, "Debería devolver un código 400 para fechas futuras"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Las fechas no pueden ser en el futuro' in response_json['error']
+
+
+    @allure.title("getReturns Maneja Fechas Invertidas")
+    @allure.description("Verifica que la vista rechace cuando la fecha inicial es posterior a la fecha final.")
+    @allure.tag("returns", "negative", "input_validation")
+    @allure.severity(allure.severity_level.NORMAL)
+    def test_get_returns_inverted_dates(self, authenticated_client):
+        payload = {
+            'from': '2023-01-10',
+            'to': '2023-01-01',
+            'brand': 'AAPL'
+        }
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} con fechas invertidas"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 400 para fechas invertidas"):
+            assert response.status_code == 400, "Debería devolver un código 400 para fechas invertidas"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'La fecha inicial debe ser anterior a la fecha final' in response_json['error']
+
+
+    @allure.title("getReturns Maneja Excepción de yfinance.Ticker().history()")
+    @allure.description("Verifica cómo responde la vista si la llamada a yfinance.history() falla.")
+    @allure.tag("returns", "negative", "error_handling")
+    @allure.severity(allure.severity_level.NORMAL)
+    @mock.patch('yfinance.Ticker')
+    def test_get_returns_handles_yfinance_exception(self, mock_yfinance_ticker_cls, authenticated_client):
+        mock_ticker_instance = mock.MagicMock()
+        simulated_error_message = "Error de conexión simulado con yfinance API"
+        mock_ticker_instance.history.side_effect = Exception(simulated_error_message)
+        mock_yfinance_ticker_cls.return_value = mock_ticker_instance
+
+        payload = {'from': '2023-01-01', 'to': '2023-01-05', 'brand': 'ERROR_TICKER'}
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} esperando una excepción de yfinance"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 500 para excepción de yfinance"):
+            assert response.status_code == 500, "Debería devolver un código 500 para error de yfinance"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Error al obtener datos de Yahoo Finance' in response_json['error']
+            assert simulated_error_message in response_json['error']
+
+
+    @allure.title("getReturns Maneja Datos Vacíos de yfinance")
+    @allure.description("Verifica cómo responde la vista cuando yfinance no devuelve datos.")
+    @allure.tag("returns", "negative", "error_handling")
+    @allure.severity(allure.severity_level.NORMAL)
+    @mock.patch('yfinance.Ticker')
+    def test_get_returns_empty_stock_data(self, mock_yfinance_ticker_cls, authenticated_client):
+        mock_ticker_instance = mock.MagicMock()
+        # Simular que history() devuelve un DataFrame vacío
+        mock_ticker_instance.history.return_value = pd.DataFrame()
+        mock_yfinance_ticker_cls.return_value = mock_ticker_instance
+
+        payload = {'from': '2023-01-01', 'to': '2023-01-05', 'brand': 'UNKNOWN'}
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} con ticker que no devuelve datos"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 404 para datos vacíos"):
+            assert response.status_code == 404, "Debería devolver un código 404 para datos vacíos"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'No se encontraron datos para UNKNOWN' in response_json['error']
+
+
+    @allure.title("getReturns Maneja Error en analyze_data")
+    @allure.description("Verifica cómo responde la vista si analyze_data lanza una excepción.")
+    @allure.tag("returns", "negative", "error_handling")
+    @allure.severity(allure.severity_level.NORMAL)
+    @mock.patch('financialSearch.views.analyze_data')
+    @mock.patch('yfinance.Ticker')
+    def test_get_returns_handles_analyze_data_exception(
+        self, 
+        mock_yfinance_ticker_cls, 
+        mock_analyze_data_func, 
+        authenticated_client,
+        mock_yfinance_data
+    ):
+        # Configurar yfinance para devolver datos válidos
+        mock_ticker_instance = mock.MagicMock()
+        mock_ticker_instance.history.return_value = mock_yfinance_data
+        mock_yfinance_ticker_cls.return_value = mock_ticker_instance
+        
+        # Configurar analyze_data para lanzar una excepción
+        simulated_analysis_error = "Error en análisis de datos"
+        mock_analyze_data_func.side_effect = Exception(simulated_analysis_error)
+
+        payload = {'from': '2023-01-01', 'to': '2023-01-05', 'brand': 'AAPL'}
+        
+        with allure.step(f"POST a {self.GET_RETURNS_URL} esperando error en analyze_data"):
+            response = authenticated_client.post(self.GET_RETURNS_URL, payload)
+        
+        with allure.step("Verificar respuesta de error 500 para excepción en analyze_data"):
+            assert response.status_code == 500, "Debería devolver un código 500 para error en analyze_data"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Error en el análisis de datos' in response_json['error']
+            assert simulated_analysis_error in response_json['error']
+
+
+    @allure.title("getReturns Rechaza Método HTTP No Permitido")
+    @allure.description("Verifica que la vista rechace métodos HTTP diferentes a POST.")
+    @allure.tag("returns", "negative", "http_method")
+    @allure.severity(allure.severity_level.NORMAL)
+    @pytest.mark.parametrize("http_method", ["GET", "PUT", "DELETE", "PATCH"])
+    def test_get_returns_invalid_http_method(self, authenticated_client, http_method):
+        with allure.step(f"Realizar solicitud {http_method} a {self.GET_RETURNS_URL}"):
+            response = getattr(authenticated_client, http_method.lower())(self.GET_RETURNS_URL)
+        
+        with allure.step("Verificar respuesta de error 405 para método no permitido"):
+            assert response.status_code == 405, f"Debería devolver un código 405 para método {http_method}"
+            response_json = response.json()
+            assert 'error' in response_json
+            assert 'Método no permitido' in response_json['error']
+
+
+    
 @allure.epic("Sistema de Análisis Financiero")
 @allure.parent_suite("Sistema de Trading Algorítmico")
 @allure.suite("Pruebas del Módulo de Análisis Financiero")
